@@ -17,10 +17,14 @@ void writecmd(command* cmd);
 void readcmd(command* cmd);
 void emptycmd(command* cmd);
 void printcmd(command* cmd);
+void initfiles();
+
+
 
 int main(){
-    char buffer[150]; 
+    char buffer[150];
 
+    initfiles();
     while(1){
         memset(buffer, '\0', 150);
         printf("> ");
@@ -86,6 +90,25 @@ void writecmd(command* cmd){
 
 void readcmd(command* cmd){
     printf("%s command called\n", cmd->type);
+
+    FILE *readtxt, *cmddir;
+    cmddir = fopen(cmd->dir, "r");
+    readtxt = fopen("read.txt", "a"); // append to read.txt
+    char rc;
+
+    if(cmddir){
+        fprintf(readtxt, "%s %s:\t", cmd->type, cmd->dir);
+
+        // read the entire file
+        while((rc = fgetc(cmddir)) != EOF) 
+            fprintf(readtxt, "%c", rc);
+        fprintf(readtxt, "\n");
+        fclose(cmddir);
+    } else{
+        fprintf(readtxt, "%s %s:\tFILE DNE\n", cmd->type, cmd->dir);
+    }
+
+    fclose(readtxt);
 }
 
 void emptycmd(command* cmd){
@@ -94,4 +117,12 @@ void emptycmd(command* cmd){
 
 void printcmd(command* cmd){
     printf("%s\n%s\n%s\n", cmd->type, cmd->dir, cmd->str);
+}
+
+void initfiles(){
+    FILE *initreadtxt, *initemptytxt; 
+    initreadtxt = fopen("read.txt", "w");
+    initemptytxt = fopen("empty.txt", "w");
+    fclose(initreadtxt);
+    fclose(initemptytxt);
 }
