@@ -12,6 +12,7 @@ struct CMD {
     char str[51];
 };  
 
+// function initializations
 command* parsecmd(char buffer[150]);
 void writecmd(command* cmd);
 void readcmd(command* cmd);
@@ -85,12 +86,14 @@ command* parsecmd(char buffer[150]){
 }
 
 void writecmd(command* cmd){
-    printf("%s command called\n", cmd->type);
+    FILE *cmddir;
+    cmddir = fopen(cmd->dir, "a");
+ 
+    fputs(cmd->str, cmddir);
+    fclose(cmddir);
 }
 
 void readcmd(command* cmd){
-    printf("%s command called\n", cmd->type);
-
     FILE *readtxt, *cmddir;
     cmddir = fopen(cmd->dir, "r");
     readtxt = fopen("read.txt", "a"); // append to read.txt
@@ -112,7 +115,28 @@ void readcmd(command* cmd){
 }
 
 void emptycmd(command* cmd){
-    printf("%s command called\n", cmd->type);
+    FILE *emptytxt, *cmddir;
+    cmddir = fopen(cmd->dir, "r");
+    emptytxt = fopen("empty.txt", "a"); // append to empty.txt
+    char rc;
+
+    if(cmddir){
+        fprintf(emptytxt, "%s %s:\t", cmd->type, cmd->dir);
+
+        // read the entire file
+        while((rc = fgetc(cmddir)) != EOF) 
+            fprintf(emptytxt, "%c", rc);
+        fprintf(emptytxt, "\n");
+        fclose(cmddir);
+
+        //empty file contents
+        cmddir = fopen(cmd->dir, "w");
+        fclose(cmddir);
+    } else{
+        fprintf(emptytxt, "%s %s:\tFILE ALREADY EMPTY\n", cmd->type, cmd->dir);
+    }
+
+    fclose(emptytxt);
 }
 
 void printcmd(command* cmd){
