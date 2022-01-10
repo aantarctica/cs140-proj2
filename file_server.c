@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
+#include <time.h>
 // #include <pthread.h>
 // #include <semaphore.h>
 
@@ -24,15 +25,24 @@ void initfiles();
 
 int main(){
     char buffer[150];
+    time_t timestamp;
 
+    // file initializations
     initfiles();
+    FILE *cmdtxt;
+    
     while(1){
+        cmdtxt = fopen("commands.txt", "a");
         memset(buffer, '\0', 150);
+        
         printf("> ");
         fgets(buffer, 150, stdin);  // gets user input and stores it to buffer
+        
+        time(&timestamp);
 
-        if((strcmp(buffer, "\n")) != 0){
-            command* cmd = parsecmd(buffer); //sends user input to parsecmd
+        if((strcmp(buffer, "\n")) != 0){        // filters out empty inputs
+            command* cmd = parsecmd(buffer);    // sends user input to parsecmd
+            fprintf(cmdtxt, "%s %s", ctime(&timestamp), buffer);
 
             // sending command to worker threads
             if(strcmp(cmd->type, "write") == 0){
@@ -43,6 +53,8 @@ int main(){
                 emptycmd(cmd);
             } else printf("Command not found\n");
         }
+
+        fclose(cmdtxt);
     }
     return 0;
 }
@@ -144,9 +156,12 @@ void printcmd(command* cmd){
 }
 
 void initfiles(){
-    FILE *initreadtxt, *initemptytxt; 
+    FILE *initcmdtxt, *initreadtxt, *initemptytxt; 
+    initcmdtxt = fopen("commands.txt", "w");
     initreadtxt = fopen("read.txt", "w");
     initemptytxt = fopen("empty.txt", "w");
+
+    fclose(initcmdtxt);
     fclose(initreadtxt);
     fclose(initemptytxt);
 }
