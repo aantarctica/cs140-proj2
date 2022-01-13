@@ -3,7 +3,7 @@
 #include <stdint.h>
 #include <string.h>
 #include <time.h>
-// #include <pthread.h>
+#include <pthread.h>
 // #include <semaphore.h>
 
 typedef struct CMD command;
@@ -42,15 +42,21 @@ int main(){
 
         if((strcmp(buffer, "\n")) != 0){        // filters out empty inputs
             command* cmd = parsecmd(buffer);    // sends user input to parsecmd
-            fprintf(cmdtxt, "%s %s", ctime(&timestamp), buffer);
+            pthread_t* worker = (pthread_t*) malloc (sizeof(pthread_t*));
 
             // sending command to worker threads
             if(strcmp(cmd->type, "write") == 0){
-                writecmd(cmd);
+                fprintf(cmdtxt, "%s %s", ctime(&timestamp), buffer);
+                pthread_create(worker, NULL, (void *) writecmd, cmd);
+
             } else if(strcmp(cmd->type, "read") == 0){
-                readcmd(cmd);
+                fprintf(cmdtxt, "%s %s", ctime(&timestamp), buffer);
+                pthread_create(worker, NULL, (void *) readcmd, cmd);
+
             } else if(strcmp(cmd->type, "empty") == 0){
-                emptycmd(cmd);
+                fprintf(cmdtxt, "%s %s", ctime(&timestamp), buffer);
+                pthread_create(worker, NULL, (void *) emptycmd, cmd);
+
             } else printf("Command not found\n");
         }
 
@@ -98,18 +104,28 @@ command* parsecmd(char buffer[150]){
 }
 
 void writecmd(command* cmd){
+    // initialize thread
+
+    // lock
     FILE *cmddir;
     cmddir = fopen(cmd->dir, "a");
- 
-    fputs(cmd->str, cmddir);
+
+    //fputs(cmd->str, cmddir);
+    fprintf(cmddir, "%s\n", cmd->str);
     fclose(cmddir);
+
+    // unlock
 }
 
 void readcmd(command* cmd){
+    // initialize thread
+
+    // use read lock
+    
     FILE *readtxt, *cmddir;
     cmddir = fopen(cmd->dir, "r");
     readtxt = fopen("read.txt", "a"); // append to read.txt
-    char rc;
+    char rc; // read character variable
 
     if(cmddir){
         fprintf(readtxt, "%s %s:\t", cmd->type, cmd->dir);
@@ -124,13 +140,15 @@ void readcmd(command* cmd){
     }
 
     fclose(readtxt);
+
+    // unlock
 }
 
 void emptycmd(command* cmd){
     FILE *emptytxt, *cmddir;
     cmddir = fopen(cmd->dir, "r");
     emptytxt = fopen("empty.txt", "a"); // append to empty.txt
-    char rc;
+    char rc; // read character variable
 
     if(cmddir){
         fprintf(emptytxt, "%s %s:\t", cmd->type, cmd->dir);
