@@ -17,7 +17,7 @@ struct CMD {
     char        type[10];
     char        dir[51];
     char        str[51];
-    command*    nextcmd;
+    command*    next;
 };  
 
 struct CMDQ {
@@ -44,26 +44,151 @@ struct WARGS{
 
 // FUNCTION INITIALIZATIONS //
 
+void worker(wargs* args);
+
+fqe* searchfqe(fileq* fq, command* cmd);
+fqe* createfqe(fileq* fq, command* cmd);
+void enqueue(cmdq* queue, command* cmd);
+command* dequeue(cmdq* queue);
+void fenqueue(fileq* fq, fqe* fp);
+cmdq* initq();
+fileq* initfq();
+
 command* parsecmd(char buffer[150]);
 void writecmd(command* cmd);
 void readcmd(command* cmd);
 void emptycmd(command* cmd);
-
-void worker(wargs* args);
-
-void enqueue(cmdq* queue, command* cmd);
-command* dequeue(cmdq* queue);
-fqe* searchfile(fileq* fq, command* cmd);
+void invalidcmd(command* cmd);
 
 void initfiles();
-cmdq* initq();
-fileq* initfq();
+void updatefile(char* filename, command* cmd);
 wargs* initargs();
 int rng_sleep();
 int rng_empty();
 
 
+void traverseFILES(fileq* fq);
+void traversecmdq(cmdq* queue);
+
+time_t timestamp;
+
 // *** FUNCTION DEFINITIONS *** //
+
+// WORKER FUNCTION //
+void worker(wargs* args){
+    sleep(rng_sleep());
+
+    command* exec_cmd = dequeue(args->queue);
+    fqe* file = searchfqe(args->fq, exec_cmd);  
+
+    sem_wait(file->lock);
+    
+    command* cmd = dequeue(file->cmdq);
+
+    if(strcmp(cmd->type, "write") == 0){
+        writecmd(cmd);
+
+    } else if(strcmp(cmd->type, "read") == 0){
+        readcmd(cmd);
+
+    } else if(strcmp(cmd->type, "empty") == 0){
+        emptycmd(cmd);
+
+    } else invalidcmd(cmd);
+    
+    // update done.txt
+    updatefile("done.txt", cmd);
+    free(cmd);
+
+    sem_post(file->lock);
+}
+
+
+// QUEUE FUNCTIONS //
+fqe* searchfqe(fileq* fq, command* cmd){
+    fqe* fp = fq->head;
+    while(fp != NULL){
+        if(strcmp(fp->file, cmd->dir) == 0){
+            return fp;
+        }
+        fp = fp->next;
+    }
+
+    // CREATE A NEW FILE QUEUE ELEMENT TO ENQUEUE
+    return createfqe(fq, cmd);
+}
+
+fqe* createfqe(fileq* fq, command* cmd){
+    fqe* nfqe = (fqe*) malloc(sizeof(fqe));
+
+    nfqe->cmdq = initq();
+
+    sem_t *lock = (sem_t*) malloc(sizeof(sem_t));
+    nfqe->lock = lock;    
+    sem_init(nfqe->lock, 0, 1);
+
+    strcpy(nfqe->file, cmd->dir);
+    fenqueue(fq, nfqe);
+    
+    return nfqe;
+}
+
+cmdq* initq(){
+    cmdq *queue = (cmdq*) malloc(sizeof(cmdq));
+    queue->head = NULL;
+    queue->tail = NULL;
+    return queue;
+}
+
+fileq* initfq(){
+    fileq *fq = (fileq*) malloc(sizeof(fileq));
+    fq->head = NULL;
+    fq->tail = NULL;
+    return fq;
+}
+
+void enqueue(cmdq* queue, command* cmd){
+    command* ncmd = (command*) malloc(sizeof(command));
+    strcpy(ncmd->type, cmd->type);
+    strcpy(ncmd->dir, cmd->dir);
+    strcpy(ncmd->str, cmd->str);
+    ncmd->next = NULL;
+
+    if(queue->head == NULL){
+        queue->head = ncmd;
+        queue->tail = ncmd;
+    } else{
+        queue->tail->next = ncmd;
+        queue->tail = ncmd;
+    }
+}
+
+command* dequeue(cmdq* queue){
+    command *cmd = (command*) malloc(sizeof(command));
+    strcpy(cmd->type, queue->head->type);
+    strcpy(cmd->dir, queue->head->dir);
+    strcpy(cmd->str, queue->head->str);
+    
+    if(cmd != NULL) queue->head = queue->head->next;
+    return cmd;
+}
+
+void fenqueue(fileq* fq, fqe* fp){ 
+    fqe* nf = (fqe*) malloc(sizeof(fqe));
+    strcpy(nf->file, fp->file);
+    nf->cmdq = fp->cmdq;
+    nf->lock = fp->lock;
+    nf->next = NULL;
+
+    if(fq->head == NULL){
+        fq->head = nf;
+        fq->tail = nf;
+    } else{
+        fq->tail->next = nf;
+        fq->tail = nf;
+    }
+}
+
 
 // COMMAND FUNCTIONS //
 
@@ -86,21 +211,17 @@ command* parsecmd(char buffer[150]){
     
     // update cmd struct
     if(strcmp(type, "write") == 0){
-        sscanf(argstr, "%s %[^\n]s", dir, str); //parse remaining arguments into dir and str
-        strcpy(cmd->type, type); 
-        strcpy(cmd->dir, dir);                  
-        strcpy(cmd->str, str);                  
-        
-    } else if(strcmp(type, "read") == 0){
-        strcpy(cmd->type, type); 
-        strcpy(cmd->dir, argstr);
-        strcpy(cmd->str, str);
-        
-    } else if(strcmp(type, "empty") == 0){
-        strcpy(cmd->type, type); 
-        strcpy(cmd->dir, argstr);
-        strcpy(cmd->str, str);
+        sscanf(argstr, "%s %[^\n]s", dir, str);                     
+    } else if(strcmp(type, "read") == 0){ 
+        strcpy(dir, argstr);        
+    } else if(strcmp(type, "empty") == 0){ 
+        strcpy(dir, argstr);
+    } else{
+        strcpy(cmd->type, "Invalid");                
     }
+    strcpy(cmd->type, type); 
+    strcpy(cmd->dir, dir);                  
+    strcpy(cmd->str, str);
 
     return cmd;
 }
@@ -116,6 +237,9 @@ void writecmd(command* cmd){
         fprintf(cmddir, "%c", (cmd->str)[i]);
         i++;
     }
+    
+    // temp checker
+    fprintf(cmddir, "\n");
 
     fclose(cmddir);
 }
@@ -167,126 +291,22 @@ void emptycmd(command* cmd){
     fclose(emptytxt);
 }
 
-
-// WORKER FUNCTION //
-void worker(wargs* args){
-    //sleep(rng_sleep());
-
-    command* exec_cmd = dequeue(args->queue);
-    fqe* file = searchfile(args->fq, exec_cmd);
-    
-    command* cmd = dequeue(file->cmdq);
-    if(cmd != NULL){
-        sem_wait(file->lock);
-        if(strcmp(cmd->type, "write") == 0){
-            writecmd(cmd);
-
-        } else if(strcmp(cmd->type, "read") == 0){
-            readcmd(cmd);
-
-        } else if(strcmp(cmd->type, "empty") == 0){
-            emptycmd(cmd);
-
-        } else printf("Command not found\n");
-
-        free(cmd);
-        sem_post(file->lock);
-    }
-}
-
-
-// QUEUE FUNCTIONS //
-
-cmdq* initq(){
-    cmdq *queue = (cmdq*) malloc(sizeof(cmdq));
-    queue->head = NULL;
-    queue->tail = NULL;
-    return queue;
-}
-
-fileq* initfq(){
-    fileq *fq = (fileq*) malloc(sizeof(fileq));
-    fq->head = NULL;
-    fq->tail = NULL;
-    return fq;
-}
-
-void enqueue(cmdq* queue, command* cmd){
-    if(queue->head == NULL){
-        queue->head = cmd;
-        queue->tail = cmd;
-        cmd->nextcmd = NULL;
-    } else{
-        cmd->nextcmd = NULL;
-        queue->tail->nextcmd = cmd;
-        queue->tail = cmd;
-    }
-}
-
-command* dequeue(cmdq* queue){
-    command *cmd = queue->head;
-    if(cmd != NULL) queue->head = cmd->nextcmd;
-    return cmd;
-}
-
-void fenqueue(fileq* fq, fqe* fp){ 
-    /* 
-    if queue is empty, 
-    set head and tail to fp
-    then let fp point to null 
-    */
-    if(fq->head == NULL){
-        fq->head = fp;
-        fq->tail = fp;
-        fp->next = NULL;
-    } 
-    /*
-    else, let fp point to NULL
-    let queue tail point to fp
-    then set tail to fp
-    */
-    
-    else{
-        fp->next = NULL;
-        fq->tail->next = fp;
-        fq->tail = fp;
-    }
-}
-
-fqe* searchfile(fileq* fq, command* cmd){
-    fqe* fp = fq->head;
-    while(fp != NULL){
-        if(strcmp(fp->file, cmd->dir) == 0){
-            return fp;
-        }
-        fp = fp->next;
-    }
-
-    // CREATE A NEW FILE QUEUE ELEMENT TO ENQUEUE
-    fqe* nfqe = (fqe*) malloc(sizeof(fqe));
-
-    nfqe->cmdq = initq();
-
-    sem_t *lock = (sem_t*) malloc(sizeof(sem_t));
-    nfqe->lock = lock;    
-    sem_init(nfqe->lock, 0, 1);
-
-    strcpy(nfqe->file, cmd->dir);
-    enqueue(nfqe->cmdq, cmd);
-    fenqueue(fq, nfqe);
-    return nfqe;
+void invalidcmd(command* cmd){
+    printf("Command not found\n");
 }
 
 // MISCELLANEOUS // 
 void initfiles(){
-    FILE *initcmdtxt, *initreadtxt, *initemptytxt; 
+    FILE *initcmdtxt, *initreadtxt, *initemptytxt, *initdonetxt; 
     initcmdtxt = fopen("commands.txt", "w");
     initreadtxt = fopen("read.txt", "w");
     initemptytxt = fopen("empty.txt", "w");
+    initdonetxt = fopen("done.txt", "w");
 
     fclose(initcmdtxt);
     fclose(initreadtxt);
     fclose(initemptytxt);
+    fclose(initdonetxt);
 }
 
 wargs* initargs(){
@@ -299,8 +319,19 @@ wargs* initargs(){
     return args;
 }
 
+void updatefile(char* filename, command* cmd){
+    time(&timestamp);
+    char *t = ctime(&timestamp);
+    t[strlen(t) - 1] = 0;
+    
+    FILE *stream = fopen(filename, "a");
+    fprintf(stream, "[%s]\t%s %s %s\n", t, cmd->type, cmd->dir, cmd->str);
+    fclose(stream);
+}
+
 int rng_sleep(){
     srand(time(0));
+    
 	if(rand()%100 >= 80){
         return 6; // return 6 20% of the time
     }
@@ -312,9 +343,33 @@ int rng_empty(){
 	return (7 + (rand()%4)); // return a random integer between 7 and 10
 }
 
+void traverseFILES(fileq* fq){
+    fqe* fp = fq->head;
+    while(fp != NULL){
+        traversecmdq(fp->cmdq);
+        fp = fp->next;
+    }
+}
+
+void traversecmdq(cmdq* queue){
+    command* cmd = queue->head;
+    while(cmd != NULL){
+        printf("%s %s %s\n", cmd->type, cmd->dir, cmd->str);
+        cmd = cmd->next;
+    }
+}
+
+
+
 /* 
 remaining tasks:
 1. fix timestamp dapat one line
 2. sscanf to strtok
 3. locks
+
+--debugging--
+1. make a separate function that traverses the file queue
+one for the main
+and one for worker thread
+
 */

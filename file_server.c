@@ -3,21 +3,18 @@
 int main(){
     // VARIABLE INITIALIZATIONS // 
     wargs *args = initargs();
-
     char buffer[150];
-    time_t timestamp;
 
     // FILE INITIALIZATIONS //
     initfiles();
     FILE *cmdtxt;
-    
+
     while(1){
         cmdtxt = fopen("commands.txt", "a");
 
         // gets user input and stores it to buffer
         memset(buffer, '\0', 150);
-        fgets(buffer, 150, stdin); 
-        time(&timestamp);
+        fgets(buffer, 150, stdin);         
 
         // filters out empty inputs
         if((strcmp(buffer, "\n")) != 0){        
@@ -25,15 +22,15 @@ int main(){
             pthread_t workerthr;
             
             // update commands.txt
-            fprintf(cmdtxt, "%s %s", ctime(&timestamp), buffer);
+            updatefile("commands.txt", cmd);
             
             // update queues
             enqueue(args->queue, cmd);
 
             // push command to file command queue
             if(cmd->dir != NULL){
-                fqe* file = searchfile(args->fq, cmd);
-                enqueue(file->cmdq, cmd);                
+                fqe* file = searchfqe(args->fq, cmd);
+                enqueue(file->cmdq, cmd);                               
             }
 
             // send command to worker thread
@@ -42,7 +39,10 @@ int main(){
         }
 
         fclose(cmdtxt);
+        // if(strcmp(buffer, "exit\n") == 0) break;
     }
+    // traverseFILES(args->fq);
+
     return 0;
 }
 
@@ -56,5 +56,8 @@ Level 4 Implementation
 
 --- debugging notes ---
 check initializations of fq and fqe
+
+-- finalizing --
+check newline printing write
 
 */
