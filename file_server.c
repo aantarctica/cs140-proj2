@@ -1,4 +1,4 @@
-#include "file_server_include.c"
+#include "functions.c"
 
 int main(){
     // INITIALIZATIONS // 
@@ -6,20 +6,20 @@ int main(){
     char buffer[150];
     initfiles();
     while(1){
-        // gets user input and stores it to buffer
+        // get user input and store to buffer
         memset(buffer, '\0', 150);
         fgets(buffer, 150, stdin);         
 
-        // filters out empty inputs
-        if(strcmp(buffer, "\n") == 0){
-            continue;
-        }
+        // filter out empty inputs
+        if(strcmp(buffer, "\n") == 0) continue;
 
+        // parse buffer into command
         command* cmd = parsecmd(buffer);
         
         // update commands.txt
         updatefile("commands.txt", cmd);
 
+        // add command to file command queue
         fqe* file = searchfqe(fq, cmd);
         enqueue(file->cmdq, cmd);                               
 
@@ -28,23 +28,6 @@ int main(){
         pthread_create(&workerthr, NULL, (void *) worker, file);
         pthread_detach(workerthr);
     }
-    // traverseFILES(args->fq);
 
     return 0;
 }
-
-
-/*
-Level 4 Implementation
-1. make structs
-2. search file queue
-3. put command in file queue element
-4. checking occurs after command is popped from queue
-
---- debugging notes ---
-check initializations of fq and fqe
-
--- finalizing --
-check newline printing write
-
-*/
