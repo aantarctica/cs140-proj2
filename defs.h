@@ -58,7 +58,7 @@ void initfiles();
 void updatefile(char* filename, command* cmd);
 int rng(int empty);
 
-// GLOBAL VARIABLE(S) // 
+// *** G L O B A L  V A R I A B L E (S) *** // 
 time_t timestamp;
 
 

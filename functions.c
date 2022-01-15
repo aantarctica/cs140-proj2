@@ -242,7 +242,7 @@ void invalidcmd(command* cmd){
     printf("Command not found\n");
 }
 
-// *** MISCELLANEOUS *** // 
+// *** M I S C E L L A N E O U S *** // 
 void initfiles(){
     FILE *initcmdtxt, *initreadtxt, *initemptytxt, *initdonetxt;
 
@@ -271,6 +271,7 @@ void updatefile(char* filename, command* cmd){
     fclose(stream);
 }
 
+// returns the random value for sleep()
 int rng(int empty){
     srand(time(0));
     int t;
