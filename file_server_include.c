@@ -37,14 +37,10 @@ struct FQ {
     fqe*        tail;
 };
 
-struct WARGS{
-    cmdq*       queue;
-    fileq*      fq;
-};
 
 // FUNCTION INITIALIZATIONS //
 
-void worker(wargs* args);
+void worker(fqe* file);
 
 fqe* searchfqe(fileq* fq, command* cmd);
 fqe* createfqe(fileq* fq, command* cmd);
@@ -62,29 +58,19 @@ void invalidcmd(command* cmd);
 
 void initfiles();
 void updatefile(char* filename, command* cmd);
-wargs* initargs();
-int rng_sleep();
-int rng_empty();
-
-
-void traverseFILES(fileq* fq);
-void traversecmdq(cmdq* queue);
+int rng(int empty);
 
 time_t timestamp;
 
 // *** FUNCTION DEFINITIONS *** //
 
 // WORKER FUNCTION //
-void worker(wargs* args){
-    sleep(rng_sleep());
-
-    command* exec_cmd = dequeue(args->queue);
-    fqe* file = searchfqe(args->fq, exec_cmd);  
+void worker(fqe* file){
+    sleep(rng(0));  
 
     sem_wait(file->lock);
     
     command* cmd = dequeue(file->cmdq);
-
     if(strcmp(cmd->type, "write") == 0){
         writecmd(cmd);
 
@@ -102,7 +88,6 @@ void worker(wargs* args){
 
     sem_post(file->lock);
 }
-
 
 // QUEUE FUNCTIONS //
 fqe* searchfqe(fileq* fq, command* cmd){
@@ -283,7 +268,7 @@ void emptycmd(command* cmd){
         //empty file contents
         cmddir = fopen(cmd->dir, "w");
         fclose(cmddir);
-        sleep(rng_empty());
+        sleep(rng(1));
     } else{
         fprintf(emptytxt, "%s %s:\tFILE ALREADY EMPTY\n", cmd->type, cmd->dir);
     }
@@ -309,16 +294,6 @@ void initfiles(){
     fclose(initdonetxt);
 }
 
-wargs* initargs(){
-    cmdq *queue = initq();
-    fileq *fq = initfq();
-
-    wargs *args = (wargs*) malloc(sizeof(wargs));
-    args->queue = queue;
-    args->fq = fq;
-    return args;
-}
-
 void updatefile(char* filename, command* cmd){
     time(&timestamp);
     char *t = ctime(&timestamp);
@@ -329,37 +304,18 @@ void updatefile(char* filename, command* cmd){
     fclose(stream);
 }
 
-int rng_sleep(){
+int rng(int empty){
     srand(time(0));
-    
-	if(rand()%100 >= 80){
-        return 6; // return 6 20% of the time
-    }
-    return 1;
+    int t;
+
+    if(empty) t = 7 + rand()%4;
+    else{
+        if(rand()%100 >= 80) t = 6;
+        else t = 1;
+    } 
+
+	return t; // return a random integer between 7 and 10
 }
-
-int rng_empty(){
-    srand(time(0));
-	return (7 + (rand()%4)); // return a random integer between 7 and 10
-}
-
-void traverseFILES(fileq* fq){
-    fqe* fp = fq->head;
-    while(fp != NULL){
-        traversecmdq(fp->cmdq);
-        fp = fp->next;
-    }
-}
-
-void traversecmdq(cmdq* queue){
-    command* cmd = queue->head;
-    while(cmd != NULL){
-        printf("%s %s %s\n", cmd->type, cmd->dir, cmd->str);
-        cmd = cmd->next;
-    }
-}
-
-
 
 /* 
 remaining tasks:
