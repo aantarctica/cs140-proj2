@@ -20,7 +20,7 @@ void worker(fqe* file){
     } else if(strcmp(cmd->type, "empty") == 0){
         emptycmd(cmd);
 
-    } else invalidcmd(cmd);
+    } else invalidcmd();
     
     // update done.txt
     updatefile("done.txt", cmd);
@@ -105,11 +105,14 @@ void enqueue(cmdq* queue, command* cmd){
 // pops the queue head from the command queue
 command* dequeue(cmdq* queue){
     command *cmd = (command*) malloc(sizeof(command));
-    strcpy(cmd->type, queue->head->type);
-    strcpy(cmd->dir, queue->head->dir);
-    strcpy(cmd->str, queue->head->str);
+    if(queue->head != NULL){
+        strcpy(cmd->type, queue->head->type);
+        strcpy(cmd->dir, queue->head->dir);
+        strcpy(cmd->str, queue->head->str);
     
-    if(cmd != NULL) queue->head = queue->head->next;
+        queue->head = queue->head->next;
+    }
+    
     return cmd;
 }
 
@@ -238,7 +241,7 @@ void emptycmd(command* cmd){
     fclose(emptytxt);
 }
 
-void invalidcmd(command* cmd){
+void invalidcmd(){
     printf("Command not found\n");
 }
 

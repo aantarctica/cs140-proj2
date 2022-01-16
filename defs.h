@@ -52,7 +52,7 @@ command*    parsecmd(char buffer[150]);
 void        writecmd(command* cmd);
 void        readcmd(command* cmd);
 void        emptycmd(command* cmd);
-void        invalidcmd(command* cmd);
+void        invalidcmd();
 
 void initfiles();
 void updatefile(char* filename, command* cmd);
